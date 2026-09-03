@@ -1,0 +1,13 @@
+{
+  "name": "token-diet-marketplace",
+  "owner": {
+    "name": "Nick Alex"
+  },
+  "plugins": [
+    {
+      "source": "./",
+      "name": "token-diet",
+      "description": "Cut Claude Code token usage by 50%+ with enforced output budgets and real measurement."
+    }
+  ]
+}

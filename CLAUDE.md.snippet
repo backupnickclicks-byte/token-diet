@@ -1,0 +1,16 @@
+<!-- token-diet: paste into your project's CLAUDE.md for always-on discipline.
+     The hooks enforce this mechanically; this makes the model cooperate by default. -->
+
+## Context budget
+
+Everything that enters context is re-sent on every later turn. Keep it small.
+
+- **Search before reading.** `rg -l 'pattern'` to find files, `rg -n 'pattern' | head -n 30`
+  to find lines. Read a whole file only when you genuinely need all of it.
+- **Read ranges, not files.** Use `offset`/`limit`, or `sed -n '120,200p' FILE`.
+  For structure first: `python3 <token-diet>/scripts/outline.py FILE`.
+- **Bound every command.** Builds, installs and test runs get `2>&1 | tail -n 30`.
+  `git log --oneline -n 20`. `git diff --stat` before any real diff. `curl -s ... | head -c 4000`.
+- **Screenshots at `scale: 0.5`** unless small text must be read — image tokens scale with area.
+- **Never re-read an unchanged file**, and never re-read a file to verify an edit.
+- **Prefer a fresh session** over working near the auto-compaction threshold.

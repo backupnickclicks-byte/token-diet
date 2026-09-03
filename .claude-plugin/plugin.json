@@ -1,0 +1,9 @@
+{
+  "name": "token-diet",
+  "description": "Cuts Claude Code token consumption by 50%+ : blocks unbounded tool output before it enters context, enforces ranged reads, right-sizes screenshots, and measures the result against your real transcripts.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nick Alex"
+  },
+  "keywords": ["tokens", "context", "cost", "performance", "hooks"]
+}
