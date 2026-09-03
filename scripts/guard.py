@@ -138,7 +138,8 @@ VERBOSE = [
      "use  find . -maxdepth 2  or  ls | head -n 50"),
     (r"\btree\b", "tree",
      "add -L 2 and append  | head -n 60"),
-    (r"\bcurl\b(?!.*-s)", "curl",
+    # -s may be bundled (-fsSL), and -o/-O send the body to a file, not to us.
+    (r"\bcurl\b(?!.*(?:-[A-Za-z]*s|--silent|--output|-o\s|-O\b))", "curl",
      "add -s and append  | head -c 4000"),
     (r"\bfind\s+/\s", "find from root",
      "scope the search to a project directory and append  | head -n 50"),
@@ -154,6 +155,41 @@ VERBOSE = [
 
 GREP_RECURSIVE = re.compile(r"\b(grep|rg|ag)\b.*(-r|-R|--recursive|\s\.\s*$|\s\.$)")
 
+QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+SEP = re.compile(r"\|\||&&|[|;\n]")
+ENV_PREFIX = re.compile(r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*")
+HEREDOC = re.compile(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
+
+
+def _strip_heredocs(cmd):
+    """Drop heredoc bodies. They are data being written, not commands."""
+    out, terminator = [], None
+    for ln in cmd.split("\n"):
+        if terminator is not None:
+            if ln.strip() == terminator:
+                terminator = None
+            continue
+        out.append(ln)
+        m = HEREDOC.search(ln)
+        if m:
+            terminator = m.group(1)
+    return "\n".join(out)
+
+
+def command_segments(cmd):
+    """Yield the parts of a command line where a command actually starts.
+
+    Quoted text and heredoc bodies are removed first, so a tool NAME appearing
+    inside an argument is never mistaken for a tool CALL -- `grep -n 'curl' f`
+    greps, it does not curl. Leading VAR=x assignments are stripped so the real
+    command is at position 0 and patterns can be anchored there.
+    """
+    clean = QUOTED.sub(" ", _strip_heredocs(cmd))
+    for seg in SEP.split(clean):
+        seg = ENV_PREFIX.sub("", seg).strip()
+        if seg:
+            yield seg
+
 
 def check_bash(cmd, cfg, session_id, st):
     if not cfg["block_bash"]:
@@ -166,7 +202,11 @@ def check_bash(cmd, cfg, session_id, st):
         allow()
 
     # cat / head-less read of a concrete large file
-    m = re.search(r"\b(?:cat|bat|less|more)\s+([^\s|;&><]+)", cmd)
+    m = None
+    for seg in command_segments(cmd):
+        m = re.match(r"(?:cat|bat|less|more)\s+([^\s|;&><]+)", seg)
+        if m:
+            break
     if m:
         target = m.group(1).strip("'\"")
         path = target if os.path.isabs(target) else os.path.join(os.getcwd(), target)
@@ -186,7 +226,9 @@ def check_bash(cmd, cfg, session_id, st):
                    os.path.dirname(os.path.abspath(__file__)), target, target, target)
             )
 
-    if GREP_RECURSIVE.search(cmd) and not re.search(r"-l\b|-c\b|--files-with-matches", cmd):
+    segs = list(command_segments(cmd))
+    if (any(GREP_RECURSIVE.match(s) for s in segs)
+            and not re.search(r"-l\b|-c\b|--files-with-matches", cmd)):
         record(session_id, st, 3000)
         block(
             "Recursive search without a bound floods context with match bodies.\n"
@@ -195,8 +237,10 @@ def check_bash(cmd, cfg, session_id, st):
             "  2) then read only the interesting ones with a line range."
         )
 
-    for pat, name, fix in VERBOSE:
-        if re.search(pat, cmd):
+    for seg in command_segments(cmd):
+        for pat, name, fix in VERBOSE:
+            if not re.match(pat, seg):
+                continue
             record(session_id, st, 2500)
             block(
                 "'%s' output is unbounded and lands in context permanently.\n"

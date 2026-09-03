@@ -40,6 +40,17 @@ def main():
         # regressions: a redirect makes `cat` a write, never a read into context
         ("cat heredoc write",          "Bash", {"command": "cat > out.py <<'EOF'\nglob.glob('a/*/b')\nEOF"}, ALLOW),
         ("cat append to big file",     "Bash", {"command": "cat >> %s" % big}, ALLOW),
+        # regressions: a tool NAME inside an argument is not a tool CALL
+        ("grep for the word curl",     "Bash", {"command": "grep -n 'curl' %s" % small}, ALLOW),
+        ("echo mentioning git log",    "Bash", {"command": "echo 'run git log later'"}, ALLOW),
+        ("heredoc body has npm i",     "Bash", {"command": "cat > n.sh <<'EOF'\nnpm install\nEOF"}, ALLOW),
+        # regressions: curl bundles short flags, and -o writes to disk
+        ("curl bundled -fsSL",         "Bash", {"command": "curl -fsSL -o f.zip https://x/f"}, ALLOW),
+        ("curl to file with -o",       "Bash", {"command": "curl -o f.zip https://x/f"}, ALLOW),
+        ("curl unbounded to stdout",   "Bash", {"command": "curl https://x/f"}, BLOCK),
+        # still blocked when it really IS the command
+        ("real git log at position",   "Bash", {"command": "git log"}, BLOCK),
+        ("real git log after &&",      "Bash", {"command": "cd /tmp && git log"}, BLOCK),
         ("rg recursive unbounded",     "Bash", {"command": "rg -r 'TODO' ."}, BLOCK),
         ("rg files-only",              "Bash", {"command": "rg -l 'TODO' | head -n 30"}, ALLOW),
         ("Read big, no range",         "Read", {"file_path": big}, BLOCK),
